@@ -1,8 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    error::{IdendityError, TransferError},
-    IdAccount, Issuer, WrappedTokenAccount, WrapperAccount,
+    check_idendity_not_recovered, error::{IdendityError, TransferError}, idendity, IdAccount, Issuer, WrappedTokenAccount, WrapperAccount
 };
 
 #[derive(Accounts)]
@@ -33,6 +32,9 @@ pub fn _transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
     if amount > source.amount {
         return Err(TransferError::InsufficientFunds.into());
     }
+
+    check_idendity_not_recovered(&ctx.accounts.idendity_sender)?;
+    check_idendity_not_recovered(&ctx.accounts.idendity_receiver)?;
 
     let sender_issuers = &ctx.accounts.idendity_sender.issuers;
     let receiver_issuers = &ctx.accounts.idendity_receiver.issuers;

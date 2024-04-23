@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("3QNgVA4mxnEtLGKNbRuKWcX4KDv16iSeLyyAexjEBHZw");
+declare_id!("Evfga9eweprsbzVdLRNRzodKqanWsYmG2AaGAwRiUqCA");
 
 #[program]
 pub mod handmade_naive {
@@ -52,6 +52,17 @@ pub mod handmade_naive {
 
     pub fn add_issuer_to_id(ctx: Context<AddIssuer>, id_validity_duration: i64) -> Result<()> {
         idendity::_add_issuer_to_id(ctx, id_validity_duration)
+    }
+
+
+    // TwoAuth instructions
+
+    pub fn update_two_auth(ctx: Context<UpdateTwoAuth>, functions: Vec<TwoAuthFunction>, allowed_issuers: Vec<Pubkey>,) -> Result<()> {
+        two_auth::_update_two_auth(ctx, functions,allowed_issuers)
+    }
+
+    pub fn remove_two_auth(ctx: Context<RemoveTwoAuth>) -> Result<()> {
+        two_auth::_remove_two_auth(ctx)
     }
 
     // Transfer instructions

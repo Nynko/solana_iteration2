@@ -33,3 +33,14 @@ pub enum IdendityError {
     #[msg("No approved issuer found or inactive/expired issuer")]
     InvalidIdendity
 }
+
+
+#[error_code]
+pub enum TwoAuthError {
+    #[msg("Not authorized to approve this transaction")]
+    NotAuthorized,
+    #[msg("Need the two auth entity approval")]
+    NeedTwoAuthApproval,
+    #[msg("The Approval has expired")]
+    ExpiredApproval,
+}

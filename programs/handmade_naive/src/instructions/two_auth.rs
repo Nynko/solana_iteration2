@@ -1,115 +1,113 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface::Mint;
 
-use crate::{TwoAuthFunction, TwoAuthParameters, WrappedTokenAccount};
+use crate::{check_idendity_not_recovered, error::TwoAuthError, IdAccount, TwoAuthFunction, TwoAuthParameters, WrappedTokenAccount, WrapperAccount};
 
 
-#[derive(Accounts)]
-#[instruction(functions: Vec<TwoAuthFunction>, allowed_issuers: Vec<Pubkey>)]
-pub struct InitializeTwoAuth<'info> {
-    #[account(init, seeds=[b"two_auth", token_account.key().as_ref()], bump, payer=owner, space= TwoAuthParameters::get_init_len(functions, allowed_issuers))]
-    pub two_auth_parameters: Account<'info, WrappedTokenAccount>,
-    pub two_auth_entity: Signer<'info>,
-    #[account(mut)]
-    pub owner: Signer<'info>,
-    #[account(mut, seeds = [b"mint"], bump)]
-    pub mint: InterfaceAccount<'info, Mint>,
-    #[account(
-        token::mint = mint,
-        token::authority = owner,
-    )]
-    pub token_account: InterfaceAccount<'info, TokenAccount>,
-    pub system_program: Program<'info, System>,
-}
 
 #[derive(Accounts)]
 #[instruction(functions: Vec<TwoAuthFunction>, allowed_issuers: Vec<Pubkey>)]
 pub struct UpdateTwoAuth<'info> {
-    #[account(init, seeds=[b"two_auth", token_account.key().as_ref()], bump, payer=owner, space= TwoAuthParameters::get_init_len(functions, allowed_issuers))]
-    pub two_auth_parameters: Account<'info, WrappedTokenAccount>,
+    #[account(seeds = [b"identity", owner.key().as_ref()], bump)]
+    pub idendity: Account<'info, IdAccount>,
+    #[account(seeds=[b"wrapper", approver.key().as_ref()], bump)]
+    pub wrapper_account: Account<'info, WrapperAccount>,
+    /// CHECK: The approver of the wrapper
+    pub approver: UncheckedAccount<'info>,
+    #[account(mut, has_one= owner, has_one=wrapper_account, has_one = mint, realloc=WrappedTokenAccount::get_init_len(Some((&functions , &allowed_issuers))), realloc::payer=owner, realloc::zero=false)]
+    pub user_wrapped_token_account: Account<'info, WrappedTokenAccount>,
     pub two_auth_entity: Signer<'info>,
+    pub old_two_auth_entity: Option<Signer<'info>>,
     #[account(mut)]
     pub owner: Signer<'info>,
-    #[account(mut, seeds = [b"mint"], bump)]
     pub mint: InterfaceAccount<'info, Mint>,
-    #[account(
-        token::mint = mint,
-        token::authority = owner,
-    )]
-    pub token_account: InterfaceAccount<'info, TokenAccount>,
     pub system_program: Program<'info, System>,
 }
+
 
 #[derive(Accounts)]
-pub struct ApproveTransaction<'info> {
-    #[account(seeds=[b"two_auth", token_account.key().as_ref()], bump)]
-    pub two_auth_parameters: Account<'info, TwoAuthParameters>,
-    #[account(mut, seeds=[b"transaction_approval", owner.key().as_ref()], bump)]
-    pub transaction_approval: Account<'info, TransactionAproval>,
+pub struct RemoveTwoAuth<'info> {
+    #[account(seeds = [b"identity", owner.key().as_ref()], bump)]
+    pub idendity: Account<'info, IdAccount>,
+    #[account(seeds=[b"wrapper", approver.key().as_ref()], bump)]
+    pub wrapper_account: Account<'info, WrapperAccount>,
+    /// CHECK: The approver of the wrapper
+    pub approver: UncheckedAccount<'info>,
+    #[account(mut, has_one= owner, has_one=wrapper_account, has_one = mint, realloc=WrappedTokenAccount::get_init_len(None), realloc::payer=owner, realloc::zero=true)]
+    pub user_wrapped_token_account: Account<'info, WrappedTokenAccount>,
+    pub two_auth_entity: Signer<'info>,
+    pub old_two_auth_entity: Option<Signer<'info>>,
     #[account(mut)]
-    pub approver: Signer<'info>,
-    #[account(seeds = [b"mint"], bump)]
+    pub owner: Signer<'info>,
     pub mint: InterfaceAccount<'info, Mint>,
-    #[account(
-        token::mint = mint,
-        token::authority = owner,
-    )]
-    pub token_account: InterfaceAccount<'info, TokenAccount>,
-    ///  CHECK : Owner of the token account
-    pub owner: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
 }
 
-#[error_code]
-pub enum TwoAuthError {
-    #[msg("Not authorized to approve this transaction")]
-    NotAuthorized,
-    #[msg("The Approval has expired")]
-    ExpiredApproval,
-}
 
-pub fn _initialize_two_auth(
-    ctx: Context<UpdateTwoAuth>,
-    functions: Vec<TwoAuthFunction>,
-    allowed_issuers: Vec<Pubkey>,
-) -> Result<()> {
-    let two_auth_parameters = &mut ctx.accounts.two_auth_parameters;
-    two_auth_parameters.functions = functions;
-    two_auth_parameters.two_auth_entity = ctx.accounts.two_auth_entity.key();
-    two_auth_parameters.allowed_issuers = allowed_issuers;
-
-    Ok(())
-}
 
 pub fn _update_two_auth(
     ctx: Context<UpdateTwoAuth>,
     functions: Vec<TwoAuthFunction>,
     allowed_issuers: Vec<Pubkey>,
 ) -> Result<()> {
-    let two_auth_parameters = &mut ctx.accounts.two_auth_parameters;
-    two_auth_parameters.functions = functions;
-    two_auth_parameters.two_auth_entity = ctx.accounts.two_auth_entity.key();
-    two_auth_parameters.allowed_issuers = allowed_issuers;
+
+    let idendity = &ctx.accounts.idendity;
+    check_idendity_not_recovered(idendity)?;
+
+    let w_token_account = &mut ctx.accounts.user_wrapped_token_account;
+    let old_two_auth_entity = &ctx.accounts.old_two_auth_entity;
+
+    check_authorization_old_two_auth_entity(old_two_auth_entity, w_token_account)?;
+
+    let two_auth_parameters = TwoAuthParameters{
+        functions: functions.clone(),
+        two_auth_entity: ctx.accounts.two_auth_entity.key(),
+        allowed_issuers: allowed_issuers.clone(),
+    };
+
+    w_token_account.two_auth = Some(two_auth_parameters);
 
     Ok(())
 }
 
-pub fn _approve_transaction(
-    ctx: Context<ApproveTransaction>,
-    transaction: TransactionRepresentation,
+#[inline(always)]
+pub fn check_authorization_old_two_auth_entity(
+    old_two_auth_entity: &Option<Signer>,
+    w_token_account: &WrappedTokenAccount,
 ) -> Result<()> {
-    let two_auth_parameters = &ctx.accounts.two_auth_parameters;
-    let two_auth_entity = &two_auth_parameters.two_auth_entity;
-    let approver = &ctx.accounts.approver.key();
-
-    if !two_auth_entity.eq(approver) {
-        return Err(TwoAuthError::NotAuthorized.into());
+    if w_token_account.two_auth.is_some() {
+        let two_auth_parameters = &w_token_account.two_auth.as_ref().unwrap();
+        match old_two_auth_entity {
+            Some(old_auth_entity) => {
+                if two_auth_parameters.two_auth_entity != old_auth_entity.key() {
+                    return Err(TwoAuthError::NotAuthorized.into());
+                }
+            }
+            None => {return Err(TwoAuthError::NeedTwoAuthApproval.into());}
+        }
     }
-
-    let transaction_approval = &mut ctx.accounts.transaction_approval;
-    transaction_approval.transaction = transaction;
-    transaction_approval.active = true;
     Ok(())
 }
+
+
+
+pub fn _remove_two_auth(
+    ctx: Context<RemoveTwoAuth>,
+) -> Result<()> {
+
+    let idendity = &ctx.accounts.idendity;
+    check_idendity_not_recovered(idendity)?;
+
+    let w_token_account = &mut ctx.accounts.user_wrapped_token_account;
+    let old_two_auth_entity = &ctx.accounts.old_two_auth_entity;
+
+    check_authorization_old_two_auth_entity(old_two_auth_entity, w_token_account)?;
+
+    w_token_account.two_auth = None;
+
+    Ok(())
+}
+
 
 // Functions from TwoAuthFunction
 
@@ -117,24 +115,20 @@ pub fn _approve_transaction(
     Returns true if there is need for two auth
 */
 pub fn apply_two_auth_functions(amount: u64, functions: &Vec<TwoAuthFunction>) -> bool {
-    return functions
-        .iter()
-        .all(|function| match_functions(amount, function));
+
+    for function in functions.iter() {
+        if match_functions(amount, function) {
+            return true;
+        }
+    }
+    return false;
 }
 
 pub fn match_functions(amount: u64, function: &TwoAuthFunction) -> bool {
     match function {
         TwoAuthFunction::Always => true,
-        TwoAuthFunction::Never => false,
         TwoAuthFunction::OnMax { max } => amount >= *max,
         _ => true,
     }
 }
 
-pub fn on_max(amount: u64, max: u64) -> bool {
-    if amount >= max {
-        return true;
-    } else {
-        return false;
-    }
-}

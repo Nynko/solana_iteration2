@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::TwoAuthParameters;
+use crate::{TwoAuthFunction, TwoAuthParameters};
 
 #[account]
 pub struct WrappedTokenAccount {
@@ -13,10 +13,11 @@ pub struct WrappedTokenAccount {
 }
 
 impl WrappedTokenAccount {
-    pub fn get_init_len(two_auth: Option<TwoAuthParameters>) -> usize {
+
+    pub fn get_init_len(two_auth: Option<(&Vec<TwoAuthFunction>,&Vec<Pubkey>)>) -> usize {
         let two_auth_len = match two_auth {
             Some(two_auth) => {
-                TwoAuthParameters::get_init_len(two_auth.functions, two_auth.allowed_issuers)
+                return TwoAuthParameters::get_init_len(two_auth.0, two_auth.1);
             }
             None => 0,
         };

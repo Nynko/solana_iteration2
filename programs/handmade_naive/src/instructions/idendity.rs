@@ -85,3 +85,14 @@ pub fn _add_issuer_to_id(ctx: Context<AddIssuer>, id_validity_duration: i64) -> 
 
     Ok(())
 }
+
+
+
+
+#[inline(always)]
+pub fn check_idendity_not_recovered(idendity: &IdAccount) -> Result<()> {
+    if idendity.recovered_address.is_some(){
+        return Err(IdendityError::IdendityRecovered.into());
+    }
+    Ok(())
+}

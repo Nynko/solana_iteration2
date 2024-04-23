@@ -1,40 +1,16 @@
 use anchor_lang::prelude::*;
 
-use crate::{error::IdendityError, ApprovedIssuer, IdAccount, Issuer};
-
-#[derive(Accounts)]
-pub struct ApproveIssuer<'info> {
-    pub issuer: Signer<'info>,
-    #[account(init, seeds = [b"issuer_approval", issuer.key().as_ref()], bump, payer = payer, space = ApprovedIssuer::LEN)]
-    pub approval: Account<'info, ApprovedIssuer>,
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    #[account(constraint = approver.key() == APPROVER)]
-    pub approver: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct RevokeIssuer<'info> {
-    /// CHECK:
-    pub issuer: AccountInfo<'info>,
-    #[account(mut, seeds = [b"issuer_approval", issuer.key().as_ref()], bump)]
-    pub approval: Account<'info, ApprovedIssuer>,
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    #[account(constraint = approver.key() == APPROVER)]
-    pub approver: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
+use crate::{error::IdendityError, IdAccount, Issuer, WrapperAccount};
 
 #[derive(Accounts)]
 pub struct InitializeId<'info> {
+    #[account(seeds=[b"wrapper", approver.key().as_ref()], bump)]
+    pub wrapper_account: Account<'info, WrapperAccount>,
+    /// CHECK: The approver of the wrapper
+    pub approver: UncheckedAccount<'info>,
     pub issuer: Signer<'info>,
-    #[account(seeds = [b"issuer_approval", issuer.key().as_ref()], bump)]
-    pub approval: Account<'info, ApprovedIssuer>,
     #[account(init, seeds = [b"identity", owner.key().as_ref()], bump, payer = payer, space = IdAccount::INIT_LEN)]
     pub idendity: Account<'info, IdAccount>,
-    /// CHECK:
     pub owner: Signer<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -45,8 +21,10 @@ pub struct InitializeId<'info> {
 pub struct AddIssuer<'info> {
     #[account(mut)]
     pub issuer: Signer<'info>,
-    #[account(seeds = [b"issuer_approval", issuer.key().as_ref()], bump)]
-    pub approval: Account<'info, ApprovedIssuer>,
+    #[account(seeds=[b"wrapper", approver.key().as_ref()], bump)]
+    pub wrapper_account: Account<'info, WrapperAccount>,
+    /// CHECK: The approver of the wrapper
+    pub approver: UncheckedAccount<'info>,
     #[account(mut,  seeds = [b"identity", owner.key().as_ref()], bump, realloc = idendity.get_add_issuer_len(), realloc::payer = owner , realloc::zero = false)]
     pub idendity: Account<'info, IdAccount>,
     #[account(mut)]
@@ -54,25 +32,12 @@ pub struct AddIssuer<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn _approve_issuer(ctx: Context<ApproveIssuer>) -> Result<()> {
-    let approval = &mut ctx.accounts.approval;
-    approval.is_active = true;
-    approval.last_modified = Clock::get()?.unix_timestamp;
-
-    Ok(())
-}
-
-pub fn _revoke_issuer(ctx: Context<RevokeIssuer>) -> Result<()> {
-    let approval = &mut ctx.accounts.approval;
-    approval.is_active = false;
-    approval.last_modified = Clock::get()?.unix_timestamp;
-
-    Ok(())
-}
-
 pub fn _initialize_id(ctx: Context<InitializeId>, id_validity_duration: i64) -> Result<()> {
     // Check if the issuer has been approved
-    if !ctx.accounts.approval.is_active {
+    let issuer = &ctx.accounts.issuer;
+    let wrapper_account = &ctx.accounts.wrapper_account;
+
+    if !wrapper_account.list_issuer.contains(issuer.key) {
         return Err(IdendityError::IssuerNotApproved.into());
     }
 
@@ -92,7 +57,10 @@ pub fn _initialize_id(ctx: Context<InitializeId>, id_validity_duration: i64) -> 
 
 pub fn _add_issuer_to_id(ctx: Context<AddIssuer>, id_validity_duration: i64) -> Result<()> {
     // Check if the issuer has been approved
-    if !ctx.accounts.approval.is_active {
+    let issuer = &ctx.accounts.issuer;
+    let wrapper_account = &ctx.accounts.wrapper_account;
+
+    if !wrapper_account.list_issuer.contains(issuer.key) {
         return Err(IdendityError::IssuerNotApproved.into());
     }
 

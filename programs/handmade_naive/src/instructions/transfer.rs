@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::Mint;
 
 use crate::{
     error::{IdendityError, TransferError},
@@ -8,28 +7,25 @@ use crate::{
 
 #[derive(Accounts)]
 pub struct Transfer<'info> {
-    #[account(mut, seeds=[b"wrapped_token", mint.key().as_ref(), source_owner.key().as_ref()], bump)]
+    #[account(mut, constraint= source_wrapped_account.wrapper_account.key() == destination_wrapped_account.wrapper_account.key())]
     pub source_wrapped_account: Account<'info, WrappedTokenAccount>,
+    #[account(constraint = source_wrapped_account.owner == source_owner.key())]
     pub source_owner: Signer<'info>,
     #[account(seeds = [b"identity", source_owner.key().as_ref()], bump)]
     pub idendity_sender: Account<'info, IdAccount>,
-    #[account(mut, seeds=[b"wrapped_token", mint.key().as_ref(), destination_owner.key().as_ref()], bump)]
+    #[account(mut, constraint = destination_wrapped_account.mint.key() == source_wrapped_account.mint.key())]
     pub destination_wrapped_account: Account<'info, WrappedTokenAccount>,
-    /// CHECK:
+    /// CHECK: The owner of the destination account
+    #[account(constraint = destination_wrapped_account.owner == destination_owner.key())]
     pub destination_owner: AccountInfo<'info>,
     #[account(seeds = [b"identity", destination_owner.key().as_ref()], bump)]
     pub idendity_receiver: Account<'info, IdAccount>,
-    pub mint: InterfaceAccount<'info, Mint>,
     pub two_auth_signer: Option<Signer<'info>>,
 }
 
-pub fn _transfer(ctx: Context<Transfer>, amount: u64, decimals: u8) -> Result<()> {
+pub fn _transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
     let source = &mut ctx.accounts.source_wrapped_account;
     let destination = &mut ctx.accounts.destination_wrapped_account;
-
-    if ctx.accounts.mint.decimals != decimals {
-        return Err(TransferError::InvalidDecimals.into());
-    }
 
     if amount > source.amount {
         return Err(TransferError::InsufficientFunds.into());

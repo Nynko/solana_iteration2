@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("AbyfdCyuhqMm1YqF1exQUaRNph8GXhj495XcXWGLMmoR");
+declare_id!("FCStgTQcY4bXiFvMgTopnKTWrS74CxgNMhSwP9XYgrAj");
 
 #[program]
 pub mod handmade_naive {
@@ -46,14 +46,6 @@ pub mod handmade_naive {
 
     // Idendity instructions
 
-    pub fn approve_issuer(ctx: Context<ApproveIssuer>) -> Result<()> {
-        idendity::_approve_issuer(ctx)
-    }
-
-    pub fn revoke_issuer(ctx: Context<RevokeIssuer>) -> Result<()> {
-        idendity::_revoke_issuer(ctx)
-    }
-
     pub fn initialize_id(ctx: Context<InitializeId>, id_validity_duration: i64) -> Result<()> {
         idendity::_initialize_id(ctx, id_validity_duration)
     }
@@ -64,7 +56,7 @@ pub mod handmade_naive {
 
     // Transfer instructions
 
-    pub fn transfer(ctx: Context<Transfer>, amount: u64, decimals: u8) -> Result<()> {
-        transfer::_transfer(ctx, amount, decimals)
+    pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
+        transfer::_transfer(ctx, amount)
     }
 }

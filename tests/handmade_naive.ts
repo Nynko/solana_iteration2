@@ -4,7 +4,7 @@ import { HandmadeNaive } from "../target/types/handmade_naive";
 import {
   create_spl_mint,
   create_spl_token_account,
-  initialize_program,
+  initialize_wrapper,
   initialize_wrapped_account,
   initialize_wrapped_token_holder,
   mint_tokens,
@@ -15,45 +15,49 @@ import { min } from "bn.js";
 import { expect } from "chai";
 import { create_user_with_best_bump, sendTransaction, sleep } from "./utils";
 import { transfer_wtokens } from "./transfer_tests";
-import { add_an_issuer, issue_first_idendity } from "./idendity_tests";
+import { issue_first_idendity } from "./idendity_tests";
 
 describe("handmade_naive", async () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
 
   const program = anchor.workspace.HandmadeNaive as Program<HandmadeNaive>;
-  let mint_info, user1_info, user2_info, wrapper;
+  let mint_info, user1_info, user2_info, wrapper, issuer;
+  let approver = anchor.Wallet.local().payer;
   let issuer_approval, user1_id;
-  const issuer = anchor.web3.Keypair.generate();
 
   it("Init", async () => {
-    const init_return = await init(program);
+    const init_return = await init(program, approver);
     mint_info = init_return.mint_info;
     user1_info = init_return.user1_info;
     user2_info = init_return.user2_info;
     wrapper = init_return.wrapper;
+    issuer = init_return.issuer;
 
     expect(mint_info.mint).to.not.be.null;
     expect(mint_info.mintAuthority).to.not.be.null;
     expect(mint_info.mintFreezeAuthority).to.not.be.null;
     expect(mint_info.token_program).to.not.be.null;
+    expect(wrapper).to.not.be.null;
+    expect(issuer).to.not.be.null;
   });
 
   it("Create IDs", async () => {
     try {
-      issuer_approval = await add_an_issuer(issuer, program);
       await issue_first_idendity(
         1000,
         user1_info.user1,
         issuer,
-        issuer_approval,
+        approver.publicKey,
+        wrapper,
         program
       );
       await issue_first_idendity(
         1000,
         user2_info.user2,
         issuer,
-        issuer_approval,
+        approver.publicKey,
+        wrapper,
         program
       );
     } catch (error) {
@@ -73,11 +77,11 @@ describe("handmade_naive", async () => {
         mint_info.token_program
       );
 
-      console.log("wrapper", wrapper.wrapper_token_holder.toBase58());
-
       await wrap_tokens(
         5,
         mint_info.decimals,
+        wrapper.wrapper_pda,
+        approver.publicKey,
         user1_info.user1,
         user1_info.token_account,
         mint_info.mint,
@@ -111,12 +115,10 @@ describe("handmade_naive", async () => {
     try {
       await transfer_wtokens(
         2,
-        mint_info.decimals,
         user1_info.user1,
         user1_info.wrapped_account,
         user2_info.user2.publicKey,
         user2_info.wrapped_account,
-        mint_info.mint,
         program
       );
     } catch (error) {
@@ -159,9 +161,13 @@ interface InitReturn {
     wrapper_pda: anchor.web3.PublicKey;
     wrapper_token_holder: anchor.web3.PublicKey;
   };
+  issuer: anchor.web3.Keypair;
 }
 
-async function init(program: Program<HandmadeNaive>): Promise<InitReturn> {
+async function init(
+  program: Program<HandmadeNaive>,
+  approver: anchor.web3.Keypair
+): Promise<InitReturn> {
   const token_program = TOKEN_PROGRAM_ID;
   const mintAuthority = anchor.web3.Keypair.generate();
   console.log("[Pk] mintAuthority", mintAuthority.publicKey.toBase58());
@@ -170,6 +176,9 @@ async function init(program: Program<HandmadeNaive>): Promise<InitReturn> {
     "[Pk] mintFreezeAuthority",
     mintFreezeAuthority.publicKey.toBase58()
   );
+
+  const issuer = anchor.web3.Keypair.generate();
+  console.log("[Pk] issuer", issuer.publicKey.toBase58());
 
   const decimals = 2;
   const mint = await create_spl_mint(
@@ -186,12 +195,15 @@ async function init(program: Program<HandmadeNaive>): Promise<InitReturn> {
   const user2 = await create_user_with_best_bump(program, mint);
   console.log("[Pk] user2", user2.publicKey.toBase58());
 
-  const wrapper_pda = await initialize_program(
+  const wrapper_pda = await initialize_wrapper(
     anchor.Wallet.local().payer,
+    issuer,
+    approver,
     program
   );
 
   const wrapper_token_holder = await initialize_wrapped_token_holder(
+    anchor.Wallet.local().publicKey,
     anchor.Wallet.local().payer,
     mint,
     wrapper_pda,
@@ -209,6 +221,8 @@ async function init(program: Program<HandmadeNaive>): Promise<InitReturn> {
   const wrapped_account = await initialize_wrapped_account(
     user1,
     mint,
+    approver.publicKey,
+    wrapper_pda,
     program,
     token_program
   );
@@ -216,6 +230,8 @@ async function init(program: Program<HandmadeNaive>): Promise<InitReturn> {
   const wrapped_account2 = await initialize_wrapped_account(
     user2,
     mint,
+    approver.publicKey,
+    wrapper_pda,
     program,
     token_program
   );
@@ -241,5 +257,6 @@ async function init(program: Program<HandmadeNaive>): Promise<InitReturn> {
       wrapper_pda,
       wrapper_token_holder,
     },
+    issuer: issuer,
   };
 }

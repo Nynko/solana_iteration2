@@ -16,6 +16,8 @@ import { expect } from "chai";
 export async function wrap_tokens(
   amount: number,
   decimals: number,
+  wrapper: anchor.web3.PublicKey,
+  approver: anchor.web3.PublicKey,
   owner: anchor.web3.Signer,
   user_token_account: anchor.web3.PublicKey,
   mint: anchor.web3.PublicKey,
@@ -29,6 +31,8 @@ export async function wrap_tokens(
       userTokenAccount: user_token_account,
       owner: owner.publicKey,
       wrapperTokenAccount: wrapper_token_holder,
+      wrapperAccount: wrapper,
+      approver: approver,
       mint: mint,
       tokenProgram: tokenProgram,
     })

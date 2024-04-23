@@ -35,6 +35,7 @@ pub struct DeleteWrapperIssuer<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub approver: Signer<'info>,
+    /// CHECK: The issuer to be removed
     #[account(constraint = wrapper_account.list_issuer.contains(&issuer.key()))]
     pub issuer: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
@@ -42,8 +43,12 @@ pub struct DeleteWrapperIssuer<'info> {
 
 #[derive(Accounts)]
 pub struct InitializeWrappedAccount<'info> {
-    #[account(init, seeds=[b"wrapped_token", mint.key().as_ref(), owner.key().as_ref()], bump, payer=payer, space=WrappedTokenAccount::get_init_len(None))]
+    #[account(init, seeds=[b"wrapped_token", wrapper_account.key().as_ref(), mint.key().as_ref(), owner.key().as_ref()], bump, payer=payer, space=WrappedTokenAccount::get_init_len(None))]
     pub wrapped_token_account: Account<'info, WrappedTokenAccount>,
+    #[account(seeds=[b"wrapper", approver.key().as_ref()], bump)]
+    pub wrapper_account: Account<'info, WrapperAccount>,
+    /// CHECK: The approver of the wrapper
+    pub approver: UncheckedAccount<'info>,
     pub owner: Signer<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -55,9 +60,8 @@ pub struct InitializeWrappedAccount<'info> {
 
 #[derive(Accounts)]
 pub struct WrapTokenHolder<'info> {
-    /// CHECK:
-    #[account(seeds=[b"wrapper"], bump)]
-    pub wrapper_account: AccountInfo<'info>,
+    #[account(seeds=[b"wrapper", approver.key().as_ref()], bump)]
+    pub wrapper_account: Account<'info, WrapperAccount>,
     #[account(
         init,
         payer = payer,
@@ -67,6 +71,8 @@ pub struct WrapTokenHolder<'info> {
     pub wrapper_associated_token_account: InterfaceAccount<'info, TokenAccount>,
     #[account(mut)]
     pub payer: Signer<'info>,
+    /// CHECK: The approver of the wrapper
+    pub approver: UncheckedAccount<'info>,
     #[account(mint::token_program = token_program)]
     pub mint: InterfaceAccount<'info, Mint>,
     pub token_program: Interface<'info, TokenInterface>,
@@ -76,16 +82,17 @@ pub struct WrapTokenHolder<'info> {
 
 #[derive(Accounts)]
 pub struct WrapTokens<'info> {
-    /// CHECK:
-    #[account(seeds=[b"wrapper"], bump)]
-    pub wrapper_account: AccountInfo<'info>,
+    #[account(seeds=[b"wrapper", approver.key().as_ref()], bump)]
+    pub wrapper_account: Account<'info, WrapperAccount>,
+    /// CHECK: The approver of the wrapper
+    pub approver: UncheckedAccount<'info>,
     #[account(
         mut,
         token::mint = mint,
         token::authority = wrapper_account,
     )]
     pub wrapper_token_account: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut, seeds=[b"wrapped_token", mint.key().as_ref(), owner.key().as_ref()], bump, has_one = mint)]
+    #[account(mut, seeds=[b"wrapped_token", wrapper_account.key().as_ref(), mint.key().as_ref(), owner.key().as_ref()], bump, has_one=wrapper_account, has_one = mint)]
     pub user_wrapped_token_account: Account<'info, WrappedTokenAccount>,
     #[account(mut, token::authority = owner, token::mint = mint)]
     pub user_token_account: InterfaceAccount<'info, TokenAccount>,
@@ -131,6 +138,7 @@ pub fn _initialize_wrap_account(ctx: Context<InitializeWrappedAccount>) -> Resul
     let wrapped_token_account = &mut ctx.accounts.wrapped_token_account;
     wrapped_token_account.amount = 0;
     wrapped_token_account.owner = ctx.accounts.owner.key();
+    wrapped_token_account.wrapper_account = ctx.accounts.wrapper_account.key();
     wrapped_token_account.mint = ctx.accounts.mint.key();
     wrapped_token_account.last_tx = Clock::get()?.unix_timestamp;
     Ok(())

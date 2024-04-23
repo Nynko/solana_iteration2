@@ -4,6 +4,7 @@ use crate::TwoAuthParameters;
 
 #[account]
 pub struct WrappedTokenAccount {
+    pub wrapper_account: Pubkey,
     pub mint: Pubkey,
     pub owner: Pubkey,
     pub amount: u64,
@@ -19,6 +20,6 @@ impl WrappedTokenAccount {
             }
             None => 0,
         };
-        return 8 + 32 + 32 + 8 + 8 + 1 + two_auth_len;
+        return 8 + 32 + 32 + 32 + 8 + 8 + 1 + two_auth_len;
     }
 }

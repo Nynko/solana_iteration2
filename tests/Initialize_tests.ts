@@ -73,25 +73,28 @@ export async function create_spl_token_account(
   return token_address;
 }
 
-export async function initialize_program(
+export async function initialize_wrapper(
   payer: anchor.web3.Signer,
+  issuer: anchor.web3.Signer,
+  approver: anchor.web3.Signer,
   program: Program<HandmadeNaive>
 ): Promise<anchor.web3.PublicKey> {
   const [wrapper_account, bump] =
     await anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("wrapper")],
+      [Buffer.from("wrapper"), approver.publicKey.toBuffer()],
       program.programId
     );
 
   console.log("[Pk] Wrapper account", wrapper_account.toBase58());
 
   const tx = await program.methods
-    .initializeProgram()
+    .initializeWrapper([issuer.publicKey])
     .accountsPartial({
       payer: payer.publicKey,
+      approver: approver.publicKey,
       wrapperAccount: wrapper_account,
     })
-    .signers([payer])
+    .signers([payer, approver])
     .rpc();
 
   console.log("Init tx", tx);
@@ -100,6 +103,7 @@ export async function initialize_program(
 }
 
 export async function initialize_wrapped_token_holder(
+  approver: anchor.web3.PublicKey,
   payer: anchor.web3.Signer,
   mint: anchor.web3.PublicKey,
   wrapper: anchor.web3.PublicKey,
@@ -119,6 +123,7 @@ export async function initialize_wrapped_token_holder(
   const tx = await program.methods
     .initializeMint()
     .accountsPartial({
+      approver: approver,
       payer: payer.publicKey,
       wrapperAccount: wrapper,
       wrapperAssociatedTokenAccount: token_address,
@@ -136,6 +141,8 @@ export async function initialize_wrapped_token_holder(
 export async function initialize_wrapped_account(
   owner: anchor.web3.Signer,
   mint: anchor.web3.PublicKey,
+  approver: anchor.web3.PublicKey,
+  wrapper_account: anchor.web3.PublicKey,
   program: Program<HandmadeNaive>,
   token_program: anchor.web3.PublicKey = TOKEN_PROGRAM_ID
 ): Promise<anchor.web3.PublicKey> {
@@ -143,6 +150,7 @@ export async function initialize_wrapped_account(
     await anchor.web3.PublicKey.findProgramAddressSync(
       [
         Buffer.from("wrapped_token"),
+        wrapper_account.toBuffer(),
         mint.toBuffer(),
         owner.publicKey.toBuffer(),
       ],
@@ -155,6 +163,8 @@ export async function initialize_wrapped_account(
     .initializeWrapAccount()
     .accountsPartial({
       payer: anchor.Wallet.local().publicKey,
+      wrapperAccount: wrapper_account,
+      approver: approver,
       owner: owner.publicKey,
       mint: mint,
       wrappedTokenAccount: wrapped_account,

@@ -49,15 +49,6 @@ export async function create_user_with_best_bump(
       user = anchor.web3.Keypair.generate();
       pda = anchor.web3.PublicKey.createProgramAddressSync(
         [
-          Buffer.from("wrapped_token"),
-          mint.toBuffer(),
-          user.publicKey.toBuffer(),
-          Buffer.from([bump]),
-        ],
-        program.programId
-      );
-      pda2 = anchor.web3.PublicKey.createProgramAddressSync(
-        [
           Buffer.from("identity"),
           user.publicKey.toBuffer(),
           Buffer.from([bump]),

@@ -14,7 +14,7 @@ import { wrap_tokens } from "./wrapped_tokens_tests";
 import { min } from "bn.js";
 import { expect } from "chai";
 import { create_user_with_best_bump, sendTransaction, sleep } from "./utils";
-import { transfer_wtokens } from "./transfer_tests";
+import { self_transfer_wtokens, transfer_wtokens } from "./transfer_tests";
 import { issue_first_idendity } from "./idendity_tests";
 
 describe("handmade_naive", async () => {
@@ -115,6 +115,7 @@ describe("handmade_naive", async () => {
     try {
       await transfer_wtokens(
         2,
+        wrapper.wrapper_pda,
         user1_info.user1,
         user1_info.wrapped_account,
         user2_info.user2.publicKey,
@@ -132,11 +133,33 @@ describe("handmade_naive", async () => {
     const user2_balance = await program.account.wrappedTokenAccount
       .fetch(user2_info.wrapped_account)
       .then((account) => account.amount.toNumber());
-    console.log("User1 Balance", user1_balance);
-    console.log("User2 Balance", user2_balance);
 
     expect(user1_balance).to.equal(3);
     expect(user2_balance).to.equal(2);
+  });
+
+  it("Self Transfer Tokens", async () => {
+    const user1_balance_init = await program.account.wrappedTokenAccount
+      .fetch(user1_info.wrapped_account)
+      .then((account) => account.amount.toNumber());
+
+    try {
+      await self_transfer_wtokens(
+        1,
+        wrapper.wrapper_pda,
+        user1_info.user1,
+        user1_info.wrapped_account,
+        program
+      );
+    } catch (error) {
+      console.log("Error", error);
+      expect(error).to.be.null;
+    }
+
+    const user1_balance = await program.account.wrappedTokenAccount
+      .fetch(user1_info.wrapped_account)
+      .then((account) => account.amount.toNumber());
+    expect(user1_balance).to.equal(user1_balance_init);
   });
 });
 

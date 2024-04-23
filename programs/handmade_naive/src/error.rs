@@ -12,6 +12,8 @@ pub enum TransferError {
     InsufficientFunds,
     #[msg("Decimal provided does not match the mint's decimal value")]
     InvalidDecimals,
+    #[msg("Overflow when subtracting or adding the amount")]
+    Overflow,
 }
 
 #[error_code]
@@ -28,4 +30,6 @@ pub enum IdendityError {
     IdendityAlreadyRecovered,
     #[msg("Issuer is not approved")]
     IssuerNotApproved,
+    #[msg("No approved issuer found or inactive/expired issuer")]
+    InvalidIdendity
 }

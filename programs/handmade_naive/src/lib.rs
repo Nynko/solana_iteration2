@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("FCStgTQcY4bXiFvMgTopnKTWrS74CxgNMhSwP9XYgrAj");
+declare_id!("3QNgVA4mxnEtLGKNbRuKWcX4KDv16iSeLyyAexjEBHZw");
 
 #[program]
 pub mod handmade_naive {

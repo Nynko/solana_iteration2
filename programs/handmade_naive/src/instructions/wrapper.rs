@@ -43,7 +43,7 @@ pub struct DeleteWrapperIssuer<'info> {
 
 #[derive(Accounts)]
 pub struct InitializeWrappedAccount<'info> {
-    #[account(init, seeds=[b"wrapped_token", wrapper_account.key().as_ref(), mint.key().as_ref(), owner.key().as_ref()], bump, payer=payer, space=WrappedTokenAccount::get_init_len(None))]
+    #[account(init, seeds=[b"wrapped_token", wrapper_account.key().as_ref(), mint.key().as_ref(), owner.key().as_ref()], bump, payer=payer, space=WrappedTokenAccount::LEN)]
     pub wrapped_token_account: Account<'info, WrappedTokenAccount>,
     #[account(seeds=[b"wrapper", approver.key().as_ref()], bump)]
     pub wrapper_account: Account<'info, WrapperAccount>,

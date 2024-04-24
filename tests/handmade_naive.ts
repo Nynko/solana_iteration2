@@ -8,6 +8,7 @@ import {
   initialize_wrapped_account,
   initialize_wrapped_token_holder,
   mint_tokens,
+  initialize_two_auth,
 } from "./Initialize_tests";
 import { TOKEN_PROGRAM_ID, transfer } from "@solana/spl-token";
 import { wrap_tokens } from "./wrapped_tokens_tests";
@@ -25,6 +26,7 @@ describe("handmade_naive", async () => {
   let mint_info, user1_info, user2_info, wrapper, issuer;
   let approver = anchor.Wallet.local().payer;
   let issuer_approval, user1_id;
+  let two_auth: anchor.web3.PublicKey;
 
   it("Init", async () => {
     const init_return = await init(program, approver);
@@ -106,6 +108,22 @@ describe("handmade_naive", async () => {
     }
   });
 
+  it("Create 2Auth", async () => {
+    try {
+      two_auth = await initialize_two_auth(
+        user1_info.user1,
+        user1_info.idendity,
+        approver.publicKey,
+        wrapper.wrapper_pda,
+        approver.publicKey,
+        program
+      );
+    } catch (error) {
+      console.log("Error", error);
+      expect(error).to.be.null;
+    }
+  });
+
   it("Transfer Tokens", async () => {
     await sendTransaction(
       anchor.Wallet.local().payer,
@@ -120,11 +138,48 @@ describe("handmade_naive", async () => {
         user1_info.wrapped_account,
         user2_info.user2.publicKey,
         user2_info.wrapped_account,
+        two_auth,
+        approver,
         program
       );
     } catch (error) {
       console.log("Error", error);
       expect(error).to.be.null;
+    }
+
+    const user1_balance = await program.account.wrappedTokenAccount
+      .fetch(user1_info.wrapped_account)
+      .then((account) => account.amount.toNumber());
+    const user2_balance = await program.account.wrappedTokenAccount
+      .fetch(user2_info.wrapped_account)
+      .then((account) => account.amount.toNumber());
+
+    expect(user1_balance).to.equal(3);
+    expect(user2_balance).to.equal(2);
+  });
+
+  it("Unapproved Transfer Tokens", async () => {
+    await sendTransaction(
+      anchor.Wallet.local().payer,
+      user1_info.user1.publicKey,
+      1000000
+    );
+    try {
+      await transfer_wtokens(
+        2,
+        wrapper.wrapper_pda,
+        user1_info.user1,
+        user1_info.wrapped_account,
+        user2_info.user2.publicKey,
+        user2_info.wrapped_account,
+        two_auth,
+        null,
+        program
+      );
+    } catch (error) {
+      expect(error.logs).to.contain(
+        "Program log: AnchorError occurred. Error Code: NeedTwoAuthApproval. Error Number: 6001. Error Message: Need the two auth entity approval."
+      );
     }
 
     const user1_balance = await program.account.wrappedTokenAccount

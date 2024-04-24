@@ -202,3 +202,73 @@ export async function mint_tokens(
     `Minted ${amount} tokens to ${token_account.toBase58()} tx : ${tx}`
   );
 }
+
+export async function initialize_two_auth(
+  owner: anchor.web3.Signer,
+  idendity: anchor.web3.PublicKey,
+  approver: anchor.web3.PublicKey,
+  wrapper_account: anchor.web3.PublicKey,
+  two_auth_entity: anchor.web3.PublicKey,
+  program: Program<HandmadeNaive>
+): Promise<anchor.web3.PublicKey> {
+  const [two_auth, bump] = await anchor.web3.PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("two_auth"),
+      wrapper_account.toBuffer(),
+      owner.publicKey.toBuffer(),
+    ],
+    program.programId
+  );
+
+  console.log("[Pk] Two Auth account", two_auth.toBase58());
+
+  const tx = await program.methods
+    .initializeTwoAuth({
+      functions: [
+        { always: {} },
+        { onMax: { max: new anchor.BN(10) } },
+        {
+          counterResetOnMax: {
+            max: new anchor.BN(10),
+            counter: new anchor.BN(0),
+          },
+        },
+        {
+          counterResetOnTime: {
+            max: new anchor.BN(10),
+            duration: { seconds: [1] },
+            lastResetTime: new anchor.BN(56),
+            counter: new anchor.BN(0),
+          },
+        },
+        {
+          counterWithTimeWindow: {
+            max: new anchor.BN(10),
+            window: {
+              duration: { days: [30] },
+              lastValueTime: new anchor.BN(0),
+              window: [],
+              startIndex: 0,
+            },
+          },
+        },
+        { deactivateForUserSpecificWhiteList: { whiteList: [] } },
+      ],
+      allowedIssuers: [approver],
+    })
+    .accountsPartial({
+      wrapperAccount: wrapper_account,
+      approver: approver,
+      owner: owner.publicKey,
+      payer: anchor.Wallet.local().publicKey,
+      twoAuth: two_auth,
+      idendity: idendity,
+      twoAuthEntity: two_auth_entity,
+    })
+    .signers([owner, anchor.Wallet.local().payer])
+    .rpc();
+
+  console.log("Init wrapped account tx", tx);
+
+  return two_auth;
+}

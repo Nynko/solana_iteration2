@@ -41,6 +41,8 @@ pub enum TwoAuthError {
     NotAuthorized,
     #[msg("Need the two auth entity approval")]
     NeedTwoAuthApproval,
+    #[msg("The provided two_auth entity is wrong")]
+    WrongApproval,
     #[msg("The Approval has expired")]
     ExpiredApproval,
 }

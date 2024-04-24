@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("Evfga9eweprsbzVdLRNRzodKqanWsYmG2AaGAwRiUqCA");
+declare_id!("6fRnWygipXdYATsJJaW26RfVih1DvJGFG5mM7NRfZpMY");
 
 #[program]
 pub mod handmade_naive {
@@ -57,13 +57,14 @@ pub mod handmade_naive {
 
     // TwoAuth instructions
 
-    pub fn update_two_auth(ctx: Context<UpdateTwoAuth>, functions: Vec<TwoAuthFunction>, allowed_issuers: Vec<Pubkey>,) -> Result<()> {
-        two_auth::_update_two_auth(ctx, functions,allowed_issuers)
+    pub fn initialize_two_auth(ctx: Context<InitTwoAuth>, two_auth: Option<TwoAuthArgs>) -> Result<()> {
+        two_auth::_initialize_two_auth(ctx, two_auth)
     }
 
-    pub fn remove_two_auth(ctx: Context<RemoveTwoAuth>) -> Result<()> {
-        two_auth::_remove_two_auth(ctx)
+    pub fn update_two_auth(ctx: Context<UpdateTwoAuth>, two_auth: Option<TwoAuthArgs>) -> Result<()> {
+        two_auth::_update_two_auth(ctx, two_auth)
     }
+
 
     // Transfer instructions
 

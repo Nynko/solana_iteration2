@@ -2,35 +2,50 @@ use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct TwoAuthParameters {
-    pub functions: Vec<TwoAuthFunction>, // 4 + 11* len
+    pub functions: Vec<TwoAuthFunction>, // TwoAuthFunction::get_init_len()
     pub two_auth_entity: Pubkey,         // 32 - Also called Insurance
     pub allowed_issuers: Vec<Pubkey>,    // 4 + 32 * len
 }
 
-impl TwoAuthParameters {
-    pub fn get_init_len(functions: &Vec<TwoAuthFunction>, allowed_issuers: &Vec<Pubkey>) -> usize {
-        return 8 + 4 + 11 * functions.len() + 32 + 4 + 32 * allowed_issuers.len();
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct TwoAuthArgs {
+    pub functions: Vec<TwoAuthFunction>,
+    pub allowed_issuers: Vec<Pubkey>,
+}
+
+#[account]
+pub struct TwoAuth {
+    pub two_auth : Option<TwoAuthParameters>
+}
+
+impl TwoAuth {
+    pub fn get_init_len(two_auth_args : &Option<TwoAuthArgs>) -> usize {
+        match two_auth_args {
+            Some(TwoAuthArgs { functions, allowed_issuers }) => {
+                let functions_space = functions.iter().map(|f| f.get_init_len()).sum::<usize>();
+                return 8 + 1 + 4 + functions_space + 32 + 4 + 32 * allowed_issuers.len();
+            }
+            None => 8 + 1 ,
+        }
     }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub enum TwoAuthFunction {
-    // 1 + MAX(all fields)  = 1 + 8 + space(Duration) = 9 + 2 = 11
     Always,
     OnMax {
         max: u64, 
     },
-    Random,
     CounterResetOnMax {
         max: u64, 
-        counter: u64, // Make sure to handle the overflow case
+        counter: u64,
     },
     CounterResetOnTime {
         // Usually the time is a day
         max: u64,
         duration: Duration,
-        counter: u64, // Make sure to handle the overflow case
-        reset_time: i64,
+        counter: u64,
+        last_reset_time: i64,
     },
     CounterWithTimeWindow {
         // Usually the time is a month (30 days)
@@ -47,11 +62,10 @@ impl TwoAuthFunction {
     pub fn get_init_len(&self) -> usize {
         match self {
             TwoAuthFunction::Always => 1,
-            TwoAuthFunction::OnMax { max } => 1 + 8,
-            TwoAuthFunction::Random => 1,
-            TwoAuthFunction::CounterResetOnMax { max, counter } => 1 + 8 + 8,
-            TwoAuthFunction::CounterResetOnTime { max, duration, counter, reset_time } => 1 + 8 + Duration::LEN + 8 + 8,
-            TwoAuthFunction::CounterWithTimeWindow { max, window } => 1 + 8 + window.get_init_len(),
+            TwoAuthFunction::OnMax { .. } => 1 + 8,
+            TwoAuthFunction::CounterResetOnMax { .. } => 1 + 8 + 8,
+            TwoAuthFunction::CounterResetOnTime { .. } => 1 + 8 + Duration::LEN + 8 + 8,
+            TwoAuthFunction::CounterWithTimeWindow { max: _, window } => 1 + 8 + window.get_init_len(),
             TwoAuthFunction::DeactivateForUserSpecificWhiteList {white_list} => 1 + 4 + 32 * white_list.len(),
         }
     }
@@ -69,7 +83,7 @@ pub struct CircularTimeWindow {
 impl CircularTimeWindow {
 
     pub fn get_init_len(&self) -> usize {
-        return 1 + 4+  self.window.len() * 8 + Duration::LEN + 8;
+        return 4 + 1 + 4 +  (self.duration.get() as usize) * 8 + Duration::LEN + 8;
     }
 
     pub fn new(duration: Duration, time: i64) -> Self {
@@ -81,20 +95,18 @@ impl CircularTimeWindow {
         }
     }
 
+    pub fn get_duration(&self) -> Duration {
+        self.duration.clone()
+    }
+
     pub fn add(&mut self, time: i64, value: u64) {
         let diff = self.get_time_difference_duration(time);
-        if diff > self.duration.get() {
-            self.start_index = 0;
-            self.window = vec![0; self.duration.get() as usize];
-            self.window[self.start_index as usize] = value;
-            
-        }  else {
-            let new_index = (self.start_index as usize + diff as usize) % self.duration.get() as usize;
-            if new_index < self.start_index as usize {
-                for i in 0..new_index { // reset all the values that are no longer in the window
-                    self.window[i] = 0;
-                }
-            }
+        if diff == 0{
+            self.window[self.start_index as usize] += value;
+        }
+        else {
+            let new_index = (self.start_index as usize + diff as usize) % self.window.len();
+            self.circular_reset_values_between_indexes(self.start_index as usize, new_index);
             self.start_index = new_index as u8;
             self.window[self.start_index as usize] = value;  
         }
@@ -103,7 +115,7 @@ impl CircularTimeWindow {
     }
 
     pub fn get(&self, index: u8) -> u64 {
-        self.window[(self.start_index + index) as usize % self.duration.get() as usize]
+        self.window[(self.start_index + index) as usize % self.window.len()]
     }
 
     pub fn get_count(&self) -> u64 {
@@ -111,9 +123,30 @@ impl CircularTimeWindow {
     }
 
 
+/*
+    Reset to 0 the values between the two indexes
+    Index1 and Index2 are not included in the reset !
+*/
+    fn circular_reset_values_between_indexes(& mut self, index1: usize, index2: usize){
+        if index1 < index2 {
+            for i in (index1+1)..index2 {
+                self.window[i] = 0;
+            }
+        }
+        else {
+            for i in (index1+1)..self.window.len() {
+                self.window[i] = 0;
+            }
+            for i in 0..index2 {
+                self.window[i] = 0;
+            }
+        }
+    }
+
+
     fn get_time_difference_duration(&self, time: i64) -> u8 {
         let diff = time - self.last_value_time;
-        if diff < 0 { // We considere that it is during the same period of time, we don't want an error 
+        if diff < 0 { // We considere that it is during the same period of time, we don't want an error raised 
             return 0;
         }
         match self.duration {
@@ -127,7 +160,7 @@ impl CircularTimeWindow {
 
     fn u8_with_overflow(time_diff: i64, overflow_value: u8) -> u8 {
         if time_diff > overflow_value as i64 { // Overflow case, it means we return to the start of the windows
-            return overflow_value + 1;
+            return overflow_value;
         }
         else {
             return time_diff as u8;
@@ -167,12 +200,12 @@ impl Duration {
 mod tests {
     #[test]
     fn circular_time_window() {
-        let mut window = super::CircularTimeWindow::new(super::Duration::Days(30), 0);
+        let window = super::CircularTimeWindow::new(super::Duration::Days(30), 0);
         assert_eq!(window.get_count(), 0);
         assert_eq!(window.window.len(), 30);
     }
     #[test]
-    fn circular_time_window_add() {
+    fn circular_time_window_get_count() {
         let day = 86400;
         let mut window = super::CircularTimeWindow::new(super::Duration::Days(30), 0);
         for i in 0..35 {
@@ -182,4 +215,34 @@ mod tests {
         window.add(100*day, 0);
         assert!(window.get_count() == 0);
     }
+
+    #[test]
+    fn circular_time_window_2_add() {
+        let day = 86400;
+        let mut window = super::CircularTimeWindow::new(super::Duration::Days(2), 0);
+        window.add(0*day, 4); // |4|0|
+        window.add(1*day, 1); // |4|1|
+        window.add(2*day, 1); // |1|1|
+        assert!(window.get_count() == 2);
+    }
+
+    #[test]
+    fn circular_time_window_in_bewteen_values() {
+        let day = 86400;
+        let mut window = super::CircularTimeWindow::new(super::Duration::Days(3), 0);
+        for i in 0..3 {
+            window.add(i*day, 1);
+        }
+        window.add(3*day, 1); // |1|1|1|
+                                          //  ^
+        assert_eq!(window.start_index ,0);
+        assert_eq!(window.get_count(), 3);
+
+        window.add(5*day, 1); // |1|1|1| => |1|0|1|
+                                          //    x ^          ^
+        assert_eq!(window.get_count(), 2);
+        assert_eq!(window.window[1], 0);
+    }
+
+
 }

@@ -36,8 +36,9 @@ pub fn _transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
     }
 
     check_idendity_not_recovered(&ctx.accounts.idendity_sender)?;
-    check_idendity_not_recovered(&ctx.accounts.idendity_receiver)?;
-
+    if !self_transfer{
+        check_idendity_not_recovered(&ctx.accounts.idendity_receiver)?;
+    }
     let two_auth = &mut ctx.accounts.two_auth.two_auth;
     let two_auth_signer = &ctx.accounts.two_auth_signer;
 
@@ -61,7 +62,7 @@ pub fn _transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
         return Ok(());
     }
 
-    source.amount = source.amount.checked_sub(amount).ok_or(TransferError::Overflow)?;
+    source.amount = source.amount.checked_sub(amount).ok_or(TransferError::InsufficientFunds)?;
     destination.amount = destination.amount.checked_add(amount).ok_or(TransferError::Overflow)?;
 
     source.last_tx = current_time;

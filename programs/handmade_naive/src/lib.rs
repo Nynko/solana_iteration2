@@ -5,11 +5,11 @@ pub mod state;
 
 use anchor_lang::prelude::*;
 
-pub use constants::*;
+// pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("6fRnWygipXdYATsJJaW26RfVih1DvJGFG5mM7NRfZpMY");
+declare_id!("5T9hgtE9SvM8LhaAMVzcFs7YycaVXd3Hr1XoKptXFqDu");
 
 #[program]
 pub mod handmade_naive {
@@ -64,6 +64,10 @@ pub mod handmade_naive {
     pub fn update_two_auth(ctx: Context<UpdateTwoAuth>, two_auth: Option<TwoAuthArgs>) -> Result<()> {
         two_auth::_update_two_auth(ctx, two_auth)
     }
+
+
+
+    // Recovery instructions
 
 
     // Transfer instructions

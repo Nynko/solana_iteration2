@@ -12,8 +12,8 @@ pub enum TransferError {
     InsufficientFunds,
     #[msg("Decimal provided does not match the mint's decimal value")]
     InvalidDecimals,
-    #[msg("Overflow when subtracting or adding the amount")]
-    Overflow,
+    #[msg("Overflow when adding the amount to the destination account")]
+    Overflow
 }
 
 #[error_code]
@@ -45,4 +45,12 @@ pub enum TwoAuthError {
     WrongApproval,
     #[msg("The Approval has expired")]
     ExpiredApproval,
+}
+
+#[error_code]
+pub enum RecoveryError {
+    #[msg("Recovery time not passed")]
+    RecoveryTimeNotPassed,
+    #[msg("Not enough signatures")]
+    NotEnoughSignatures,
 }

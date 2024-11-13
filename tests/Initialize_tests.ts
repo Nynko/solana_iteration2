@@ -102,7 +102,7 @@ export async function initialize_wrapper(
   return wrapper_account;
 }
 
-export async function initialize_wrapped_token_holder(
+export async function initialize_wrapper_token_holder(
   approver: anchor.web3.PublicKey,
   payer: anchor.web3.Signer,
   mint: anchor.web3.PublicKey,
@@ -225,7 +225,6 @@ export async function initialize_two_auth(
   const tx = await program.methods
     .initializeTwoAuth({
       functions: [
-        { always: {} },
         { onMax: { max: new anchor.BN(10) } },
         {
           counterResetOnMax: {
@@ -253,6 +252,7 @@ export async function initialize_two_auth(
           },
         },
         { deactivateForUserSpecificWhiteList: { whiteList: [] } },
+        { always: {} },
       ],
       allowedIssuers: [approver],
     })
@@ -268,7 +268,7 @@ export async function initialize_two_auth(
     .signers([owner, anchor.Wallet.local().payer])
     .rpc();
 
-  console.log("Init wrapped account tx", tx);
+  console.log("Init two_auth tx", tx);
 
   return two_auth;
 }

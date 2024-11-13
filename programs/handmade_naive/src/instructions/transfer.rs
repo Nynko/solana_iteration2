@@ -58,14 +58,14 @@ pub fn _transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
     }
 
 
+    source.last_tx = current_time;
+
     if self_transfer{ // Otherwise the source and destination are treated as different entities which leads to different amount
         return Ok(());
     }
 
     source.amount = source.amount.checked_sub(amount).ok_or(TransferError::InsufficientFunds)?;
     destination.amount = destination.amount.checked_add(amount).ok_or(TransferError::Overflow)?;
-
-    source.last_tx = current_time;
 
     Ok(())
 }
@@ -96,7 +96,8 @@ pub fn check_two_auth(two_auth: &mut Option<TwoAuthParameters>, two_auth_signer:
             Some(signer) => {
                 if two_auth_parameters.two_auth_entity != signer.key() {
                     return Err(TwoAuthError::WrongApproval.into());
-                }
+                } 
+                // if we have a proper two auth signature, no need to check if the two auth is needed 
             }
             None => {if two_auth::apply_two_auth_functions(amount, functions, current_time, receiver) {
                         return Err(TwoAuthError::NeedTwoAuthApproval.into());

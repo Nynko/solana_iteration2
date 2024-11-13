@@ -9,7 +9,7 @@ use anchor_lang::prelude::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("5T9hgtE9SvM8LhaAMVzcFs7YycaVXd3Hr1XoKptXFqDu");
+declare_id!("Gm46kq7uRZyLLELC4vpcPk3eX3PXU14RWovU5a89VUtF");
 
 #[program]
 pub mod handmade_naive {
@@ -44,6 +44,8 @@ pub mod handmade_naive {
         wrapper::_wrap_tokens(ctx, amount, decimals)
     }
 
+    // TODO: Unwrap tokens
+
     // Idendity instructions
 
     pub fn initialize_id(ctx: Context<InitializeId>, id_validity_duration: i64) -> Result<()> {
@@ -54,25 +56,33 @@ pub mod handmade_naive {
         idendity::_add_issuer_to_id(ctx, id_validity_duration)
     }
 
-
     // TwoAuth instructions
 
-    pub fn initialize_two_auth(ctx: Context<InitTwoAuth>, two_auth: Option<TwoAuthArgs>) -> Result<()> {
+    pub fn initialize_two_auth(
+        ctx: Context<InitTwoAuth>,
+        two_auth: Option<TwoAuthArgs>,
+    ) -> Result<()> {
         two_auth::_initialize_two_auth(ctx, two_auth)
     }
 
-    pub fn update_two_auth(ctx: Context<UpdateTwoAuth>, two_auth: Option<TwoAuthArgs>) -> Result<()> {
+    pub fn update_two_auth(
+        ctx: Context<UpdateTwoAuth>,
+        two_auth: Option<TwoAuthArgs>,
+    ) -> Result<()> {
         two_auth::_update_two_auth(ctx, two_auth)
     }
 
-
-
     // Recovery instructions
-
 
     // Transfer instructions
 
     pub fn transfer(ctx: Context<Transfer>, amount: u64) -> Result<()> {
         transfer::_transfer(ctx, amount)
     }
+
+    // Bridge with external world
+
+    // pub fn bridge_contract(ctx: Context<Transfer>, instruction_data: &[u8]) -> ProgramResult {
+    //     Ok(())
+    // }
 }

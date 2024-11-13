@@ -41,13 +41,12 @@ export async function create_user_with_best_bump(
   mint: anchor.web3.PublicKey
 ) {
   let user;
-  let pda, pda2;
   let errorOccurred = true;
   const bump = 255;
   while (errorOccurred) {
     try {
       user = anchor.web3.Keypair.generate();
-      pda = anchor.web3.PublicKey.createProgramAddressSync(
+      anchor.web3.PublicKey.createProgramAddressSync(
         [
           Buffer.from("identity"),
           user.publicKey.toBuffer(),
@@ -55,6 +54,15 @@ export async function create_user_with_best_bump(
         ],
         program.programId
       );
+      // anchor.web3.PublicKey.createProgramAddressSync(
+      //   [
+      //     Buffer.from('two_auth'),
+      //     wrapper_account.toBuffer(),
+      //     keypair.publicKey.toBuffer(),
+      //     Buffer.from([bump]),
+      //   ],
+      //   programId,
+      // );
       errorOccurred = false;
     } catch (error) {
       continue;

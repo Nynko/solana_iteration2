@@ -25,6 +25,7 @@ export async function issue_first_idendity(
       issuer: issuer.publicKey,
       owner: owner.publicKey,
       payer: anchor.Wallet.local().publicKey,
+      idendity: idendity,
     })
     .signers([issuer, anchor.Wallet.local().payer, owner])
     .rpc();

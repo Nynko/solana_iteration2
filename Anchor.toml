@@ -5,13 +5,16 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-handmade_naive = "2HWXfYcvZGR8MGrjAwn4JFiLHTptZF8ArPCNrCd8ZJKz"
+handmade_naive = "Gm46kq7uRZyLLELC4vpcPk3eX3PXU14RWovU5a89VUtF"
+
+[programs.devnet]
+handmade_naive = "Gm46kq7uRZyLLELC4vpcPk3eX3PXU14RWovU5a89VUtF"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "localnet"
 wallet = "/Users/nicolasbeaudouin/.config/solana/id.json"
 
 [scripts]
